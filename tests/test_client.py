@@ -58,7 +58,7 @@ class StaleHTTPClientTestCase(AsyncHTTPTestCase):
         fake_response = self.fake_client.add_response(
             code=200, body=b'fake response', headers={'fake': 'header'})
 
-        client = StaleHTTPClient(client=self.fake_client)
+        client = StaleHTTPClient(client=self.fake_client, cache=self.cache)
 
         response = yield client.fetch('/url')
 
@@ -68,7 +68,7 @@ class StaleHTTPClientTestCase(AsyncHTTPTestCase):
     def test_accepts_request_object(self):
         fake_response = self.fake_client.add_response()
 
-        client = StaleHTTPClient(client=self.fake_client)
+        client = StaleHTTPClient(client=self.fake_client, cache=self.cache)
 
         request = HTTPRequest('/url')
         response = yield client.fetch(request)
@@ -79,7 +79,7 @@ class StaleHTTPClientTestCase(AsyncHTTPTestCase):
     def test_returns_real_response(self):
         expected_response = self.fake_client.add_response()
 
-        client = StaleHTTPClient(client=self.fake_client)
+        client = StaleHTTPClient(client=self.fake_client, cache=self.cache)
         response = yield client.fetch('/url')
 
         self.assertIs(response, expected_response)
@@ -88,7 +88,7 @@ class StaleHTTPClientTestCase(AsyncHTTPTestCase):
     def test_returns_response_from_primary_cache(self):
         response = self.fake_client.add_response()
 
-        client = StaleHTTPClient(client=self.fake_client)
+        client = StaleHTTPClient(client=self.fake_client, cache=self.cache)
         response = yield client.fetch('/url')
         cached_response = yield client.fetch('/url')
 
@@ -100,10 +100,10 @@ class StaleHTTPClientTestCase(AsyncHTTPTestCase):
         expected_response = self.fake_client.add_response(body=b'stale')
         error_response = self.fake_client.add_response(body=b'error', code=500)
 
-        client = StaleHTTPClient(client=self.fake_client, ttl=0.001)
+        client = StaleHTTPClient(client=self.fake_client, ttl=0.01, cache=self.cache)
 
         yield client.fetch('/url')
-        yield tornado.gen.sleep(0.002)
+        yield tornado.gen.sleep(0.02)
         stale_response = yield client.fetch('/url')
 
         self.assertIsNot(stale_response, error_response)
@@ -114,23 +114,22 @@ class StaleHTTPClientTestCase(AsyncHTTPTestCase):
         stale_response = self.fake_client.add_response(body=b'stale')
         error_response = self.fake_client.add_response(body=b'error', code=500)
 
-        client = StaleHTTPClient(client=self.fake_client, ttl=0.001, stale_ttl=0.002)
+        client = StaleHTTPClient(client=self.fake_client, ttl=0.01, stale_ttl=0.02, cache=self.cache)
 
         yield client.fetch('/url')
         current_response = yield client.fetch('/url')
         self.assertIsNot(current_response, error_response)
         self.assertResponseEqual(current_response, stale_response)
-        yield tornado.gen.sleep(0.003)
+        yield tornado.gen.sleep(0.03)
 
         with self.assertRaises(HTTPError):
             yield client.fetch('/url')
-
 
     @gen_test
     def test_raises_error_after_error_with_empty_cache(self):
         self.fake_client.add_response(body=b'error', code=500)
 
-        client = StaleHTTPClient(client=self.fake_client, ttl=None)
+        client = StaleHTTPClient(client=self.fake_client, ttl=None, cache=self.cache)
 
         with self.assertRaises(HTTPError):
             yield client.fetch('/url')
@@ -140,7 +139,7 @@ class StaleHTTPClientTestCase(AsyncHTTPTestCase):
         expected_response = self.fake_client.add_response(
             body=b'error', code=500)
 
-        client = StaleHTTPClient(client=self.fake_client, ttl=None)
+        client = StaleHTTPClient(client=self.fake_client, ttl=None, cache=self.cache)
 
         response = yield client.fetch('/url', raise_error=False)
 
@@ -151,7 +150,7 @@ class StaleHTTPClientTestCase(AsyncHTTPTestCase):
         first_expected = self.fake_client.add_response()
         second_expected = self.fake_client.add_response()
 
-        client = StaleHTTPClient(client=self.fake_client, ttl=1)
+        client = StaleHTTPClient(client=self.fake_client, ttl=1, cache=self.cache)
 
         # Populate cache
         yield [client.fetch('/first'), client.fetch('/second')]
@@ -171,7 +170,7 @@ class StaleHTTPClientTestCase(AsyncHTTPTestCase):
         json_response = self.fake_client.add_response(body=b'{}')
         xml_response = self.fake_client.add_response(body=b'<xml />')
 
-        client = StaleHTTPClient(client=self.fake_client, ttl=1)
+        client = StaleHTTPClient(client=self.fake_client, ttl=1, cache=self.cache)
 
         # Populate and read from cache
         for i in range(2):
